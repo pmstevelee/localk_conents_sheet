@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버 카페 크롤러</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+            padding: 30px 0;
+        }
+
+        header h1 {
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid #ecf0f1;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            padding: 15px 30px;
+            text-decoration: none;
+            color: #7f8c8d;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+            color: #2ecc71;
+            background-color: #f8f9fa;
+        }
+
+        .nav-tab.active {
+            color: #2ecc71;
+            border-bottom-color: #2ecc71;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-full {
+            grid-template-columns: 1fr;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+            font-size: 1.3em;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-check input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-hint {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-top: 3px;
+        }
+
+        /* Status Box */
+        .status-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .status-idle {
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        .status-running {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-progress {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* File List */
+        .file-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background-color 0.2s;
+        }
+
+        .file-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .file-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #2c3e50;
+            word-break: break-all;
+        }
+
+        .file-meta {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
+        .btn-lg {
+            padding: 12px 30px;
+            font-size: 1.1em;
+        }
+
+        .btn-block {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Keyword Tags */
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-group .form-control {
+            flex: 1;
+        }
+
+        .keyword-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .keyword-tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #ecf0f1;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .keyword-tag .remove-btn {
+            margin-left: 8px;
+            color: #e74c3c;
+            cursor: pointer;
+            font-weight: bold;
+            background: none;
+            border: none;
+        }
+
+        .keyword-tag .remove-btn:hover {
+            color: #c0392b;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed #bdc3c7;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+        }
+
+        .upload-area:hover {
+            border-color: #3498db;
+            background-color: #f8f9fa;
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .upload-area label {
+            cursor: pointer;
+            color: #7f8c8d;
+        }
+
+        .upload-area label:hover {
+            color: #3498db;
+        }
+
+        /* Select Controls */
+        .select-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .select-controls button {
+            background: none;
+            border: none;
+            color: #3498db;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .select-controls button:hover {
+            text-decoration: underline;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state p {
+            margin-top: 10px;
+        }
+
+        /* Result Info */
+        .result-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .result-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .result-item .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+
+        .result-item .label {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>네이버 카페 크롤러</h1>
+            <p>크롤링, QA 추출, 설정 통합 관리</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <a href="{{ url_for('index') }}" class="nav-tab {% if page == 'crawl' %}active{% endif %}">크롤링</a>
+            <a href="{{ url_for('qa_page') }}" class="nav-tab {% if page == 'qa' %}active{% endif %}">QA 추출</a>
+            <a href="{{ url_for('settings_page') }}" class="nav-tab {% if page == 'settings' %}active{% endif %}">설정</a>
+        </nav>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% if page == 'crawl' %}
+        <!-- ===== 크롤링 페이지 ===== -->
+        <div class="grid">
+            <div class="card">
+                <h2>크롤링 설정</h2>
+                <form action="{{ url_for('start_crawl') }}" method="post" id="crawl-form">
+                    <div class="form-group">
+                        <label for="cafe_id">카페 ID *</label>
+                        <input type="text" name="cafe_id" id="cafe_id" class="form-control"
+                               value="{{ config.cafe_id }}" placeholder="예: myhalifaxstory" required>
+                        <div class="form-hint">카페 URL에서 확인: cafe.naver.com/<strong>카페ID</strong></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="board_url">게시판 URL *</label>
+                        <input type="text" name="board_url" id="board_url" class="form-control"
+                               value="{{ config.board_url }}" placeholder="게시판 전체 URL 입력" required>
+                        <div class="form-hint">크롤링할 게시판의 전체 URL을 입력하세요</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="user_id">네이버 아이디</label>
+                            <input type="text" name="user_id" id="user_id" class="form-control"
+                                   value="{{ config.user_id }}" placeholder="로그인용 (선택)">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">네이버 비밀번호</label>
+                            <input type="password" name="password" id="password" class="form-control"
+                                   placeholder="저장되지 않음">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="max_posts">최대 게시글 수</label>
+                            <input type="number" name="max_posts" id="max_posts" class="form-control"
+                                   value="{{ config.max_posts }}" min="1" max="500">
+                        </div>
+                        <div class="form-group">
+                            <label for="max_pages">최대 페이지 수</label>
+                            <input type="number" name="max_pages" id="max_pages" class="form-control"
+                                   value="{{ config.max_pages }}" min="1" max="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" name="today_only" id="today_only"
+                                       {% if config.today_only %}checked{% endif %}>
+                                <label for="today_only">오늘 작성된 글만 수집</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" name="headless" id="headless"
+                                       {% if config.headless %}checked{% endif %}>
+                                <label for="headless">백그라운드 실행 (헤드리스)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg btn-block" id="start-btn"
+                            {% if crawl_status and crawl_status.is_running %}disabled{% endif %}>
+                        크롤링 시작
+                    </button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>크롤링 상태</h2>
+                <div id="status-container">
+                    {% if crawl_status and crawl_status.is_running %}
+                        <div class="status-box status-running">
+                            <div class="status-progress">
+                                <div class="spinner"></div>
+                                <span id="status-text">{{ crawl_status.progress }}</span>
+                            </div>
+                        </div>
+                    {% elif crawl_status and crawl_status.last_result %}
+                        {% if crawl_status.last_result.success %}
+                            <div class="status-box status-success">
+                                <strong>크롤링 완료</strong>
+                                <div class="result-info">
+                                    <div class="result-item">
+                                        <div class="value">{{ crawl_status.last_result.posts }}</div>
+                                        <div class="label">게시글</div>
+                                    </div>
+                                    <div class="result-item">
+                                        <div class="value">{{ crawl_status.last_result.comments }}</div>
+                                        <div class="label">댓글</div>
+                                    </div>
+                                    <div class="result-item">
+                                        <div class="value">{{ crawl_status.last_result.time|truncate(10, True, '') }}</div>
+                                        <div class="label">완료 시간</div>
+                                    </div>
+                                </div>
+                                {% if crawl_status.last_result.file %}
+                                    <p style="margin-top: 10px;">
+                                        저장된 파일: <strong>{{ crawl_status.last_result.file }}</strong>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="status-box status-error">
+                                <strong>크롤링 실패</strong>
+                                <p>{{ crawl_status.last_result.error }}</p>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="status-box status-idle">
+                            <p>크롤링 대기 중</p>
+                            <p style="font-size: 0.9em; margin-top: 5px;">설정을 입력하고 크롤링을 시작하세요.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <h2 style="margin-top: 20px;">수집 제외 키워드</h2>
+                <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 0.9em;">
+                    이 키워드가 포함된 게시글은 수집되지 않습니다.
+                </p>
+                <form action="{{ url_for('add_keyword_form') }}" method="post">
+                    <div class="input-group">
+                        <input type="text" name="keyword" class="form-control" placeholder="제외 키워드 입력">
+                        <button type="submit" class="btn btn-primary">추가</button>
+                    </div>
+                </form>
+                <div class="keyword-tags">
+                    {% if exclude_keywords %}
+                        {% for keyword in exclude_keywords %}
+                            <span class="keyword-tag">
+                                {{ keyword }}
+                                <form action="{{ url_for('remove_keyword_form', keyword=keyword) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="remove-btn" title="삭제">&times;</button>
+                                </form>
+                            </span>
+                        {% endfor %}
+                    {% else %}
+                        <span style="color: #95a5a6;">등록된 키워드 없음</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 크롤링된 파일 목록 -->
+        <div class="card">
+            <h2>크롤링된 CSV 파일</h2>
+            {% if csv_files %}
+                <div class="file-list">
+                    {% for file in csv_files %}
+                        <div class="file-item">
+                            <div class="file-info">
+                                <div class="file-name">{{ file.name }}</div>
+                                <div class="file-meta">{{ file.size }} | {{ file.modified }}</div>
+                            </div>
+                            <div class="file-actions">
+                                <a href="{{ url_for('download_file', filename=file.name) }}" class="btn btn-primary btn-sm">다운로드</a>
+                                <form action="{{ url_for('delete_file', filename=file.name) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('삭제하시겠습니까?')">삭제</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>크롤링된 파일이 없습니다.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        {% elif page == 'qa' %}
+        <!-- ===== QA 추출 페이지 ===== -->
+        <div class="grid">
+            <div class="card">
+                <h2>CSV 파일 업로드</h2>
+                <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+                    <div class="upload-area">
+                        <input type="file" name="file" id="file-input" accept=".csv">
+                        <label for="file-input">
+                            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p>클릭하여 CSV 파일 선택</p>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-block">업로드</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>QA 추출 결과</h2>
+                {% if qa_files %}
+                    <div class="file-list">
+                        {% for file in qa_files %}
+                            <div class="file-item">
+                                <div class="file-info">
+                                    <div class="file-name">{{ file.name }}</div>
+                                    <div class="file-meta">{{ file.size }} | {{ file.modified }}</div>
+                                </div>
+                                <div class="file-actions">
+                                    <a href="{{ url_for('download_file', filename=file.name) }}" class="btn btn-success btn-sm">다운로드</a>
+                                    <form action="{{ url_for('delete_file', filename=file.name) }}" method="post" style="display: inline;">
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('삭제하시겠습니까?')">삭제</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <p>추출된 QA 파일이 없습니다.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>크롤링된 CSV 파일에서 QA 추출</h2>
+            <p style="color: #7f8c8d; margin-bottom: 15px;">
+                파일을 선택하고 QA 추출 버튼을 클릭하세요. 질문형 게시글과 답변을 자동으로 추출합니다.
+            </p>
+
+            <form action="{{ url_for('extract_qa') }}" method="post" id="extract-form">
+                {% if csv_files %}
+                    <div class="select-controls">
+                        <button type="button" onclick="selectAll()">전체 선택</button>
+                        <button type="button" onclick="deselectAll()">선택 해제</button>
+                    </div>
+
+                    <div class="file-list">
+                        {% for file in csv_files %}
+                            <div class="file-item">
+                                <input type="checkbox" name="files" value="{{ file.name }}" id="file-{{ loop.index }}">
+                                <label for="file-{{ loop.index }}" class="file-info">
+                                    <div class="file-name">{{ file.name }}</div>
+                                    <div class="file-meta">{{ file.size }} | {{ file.modified }}</div>
+                                </label>
+                                <div class="file-actions">
+                                    <a href="{{ url_for('download_file', filename=file.name) }}" class="btn btn-primary btn-sm">다운로드</a>
+                                    <form action="{{ url_for('delete_file', filename=file.name) }}" method="post" style="display: inline;">
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('삭제하시겠습니까?')">삭제</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg btn-block" style="margin-top: 15px;">
+                        선택한 파일에서 QA 추출
+                    </button>
+                {% else %}
+                    <div class="empty-state">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                            <polyline points="13 2 13 9 20 9"></polyline>
+                        </svg>
+                        <p>크롤링된 CSV 파일이 없습니다.</p>
+                        <p style="font-size: 0.9em;">CSV 파일을 업로드하거나 크롤링을 실행해주세요.</p>
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+
+        {% elif page == 'settings' %}
+        <!-- ===== 설정 페이지 ===== -->
+        <div class="grid">
+            <div class="card">
+                <h2>크롤링 기본 설정</h2>
+                <form action="{{ url_for('save_config') }}" method="post">
+                    <div class="form-group">
+                        <label for="cafe_id">카페 ID</label>
+                        <input type="text" name="cafe_id" id="cafe_id" class="form-control"
+                               value="{{ config.cafe_id }}" placeholder="예: myhalifaxstory">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="board_url">게시판 URL</label>
+                        <input type="text" name="board_url" id="board_url" class="form-control"
+                               value="{{ config.board_url }}" placeholder="게시판 전체 URL">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="user_id">네이버 아이디</label>
+                        <input type="text" name="user_id" id="user_id" class="form-control"
+                               value="{{ config.user_id }}" placeholder="로그인용">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="max_posts">최대 게시글 수</label>
+                            <input type="number" name="max_posts" id="max_posts" class="form-control"
+                                   value="{{ config.max_posts }}" min="1" max="500">
+                        </div>
+                        <div class="form-group">
+                            <label for="max_pages">최대 페이지 수</label>
+                            <input type="number" name="max_pages" id="max_pages" class="form-control"
+                                   value="{{ config.max_pages }}" min="1" max="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" name="today_only" id="today_only_setting"
+                                       {% if config.today_only %}checked{% endif %}>
+                                <label for="today_only_setting">오늘 작성된 글만 수집</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" name="headless" id="headless_setting"
+                                       {% if config.headless %}checked{% endif %}>
+                                <label for="headless_setting">백그라운드 실행</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">설정 저장</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>수집 제외 키워드 관리</h2>
+                <p style="color: #7f8c8d; margin-bottom: 15px;">
+                    이 키워드가 포함된 게시글은 크롤링 시 제외됩니다.
+                </p>
+
+                <form action="{{ url_for('add_keyword_form') }}" method="post">
+                    <div class="input-group">
+                        <input type="text" name="keyword" class="form-control" placeholder="제외할 키워드 입력">
+                        <button type="submit" class="btn btn-primary">추가</button>
+                    </div>
+                </form>
+
+                <div class="keyword-tags">
+                    {% if exclude_keywords %}
+                        {% for keyword in exclude_keywords %}
+                            <span class="keyword-tag">
+                                {{ keyword }}
+                                <form action="{{ url_for('remove_keyword_form', keyword=keyword) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="remove-btn" title="삭제">&times;</button>
+                                </form>
+                            </span>
+                        {% endfor %}
+                    {% else %}
+                        <span style="color: #95a5a6;">등록된 제외 키워드가 없습니다.</span>
+                    {% endif %}
+                </div>
+
+                {% if exclude_keywords %}
+                    <form action="{{ url_for('clear_keywords') }}" method="post" style="margin-top: 15px;">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('모든 제외 키워드를 삭제하시겠습니까?')">
+                            모든 키워드 삭제
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function selectAll() {
+            document.querySelectorAll('#extract-form input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('#extract-form input[type="checkbox"]').forEach(cb => cb.checked = false);
+        }
+
+        document.getElementById('file-input')?.addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name;
+            if (fileName) {
+                this.parentElement.querySelector('p').textContent = fileName;
+            }
+        });
+
+        // 크롤링 상태 자동 새로고침
+        {% if page == 'crawl' and crawl_status and crawl_status.is_running %}
+        function checkStatus() {
+            fetch('{{ url_for("get_crawl_status") }}')
+                .then(response => response.json())
+                .then(data => {
+                    const statusText = document.getElementById('status-text');
+                    if (statusText) {
+                        statusText.textContent = data.progress;
+                    }
+
+                    if (!data.is_running) {
+                        // 크롤링 완료 시 페이지 새로고침
+                        location.reload();
+                    } else {
+                        // 계속 체크
+                        setTimeout(checkStatus, 2000);
+                    }
+                })
+                .catch(err => {
+                    console.error('Status check failed:', err);
+                    setTimeout(checkStatus, 5000);
+                });
+        }
+
+        checkStatus();
+        {% endif %}
+    </script>
+</body>
+</html>
