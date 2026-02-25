@@ -725,13 +725,13 @@
                 파일을 선택하고 QA 추출 버튼을 클릭하세요. 질문형 게시글과 답변을 자동으로 추출합니다.
             </p>
 
-            <form action="{{ url_for('extract_qa') }}" method="post" id="extract-form">
-                {% if csv_files %}
-                    <div class="select-controls">
-                        <button type="button" onclick="selectAll()">전체 선택</button>
-                        <button type="button" onclick="deselectAll()">선택 해제</button>
-                    </div>
+            {% if csv_files %}
+                <div class="select-controls">
+                    <button type="button" onclick="selectAll()">전체 선택</button>
+                    <button type="button" onclick="deselectAll()">선택 해제</button>
+                </div>
 
+                <form action="{{ url_for('extract_qa') }}" method="post" id="extract-form">
                     <div class="file-list">
                         {% for file in csv_files %}
                             <div class="file-item">
@@ -742,9 +742,7 @@
                                 </label>
                                 <div class="file-actions">
                                     <a href="{{ url_for('download_file', filename=file.name) }}" class="btn btn-primary btn-sm">다운로드</a>
-                                    <form action="{{ url_for('delete_file', filename=file.name) }}" method="post" style="display: inline;">
-                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('삭제하시겠습니까?')">삭제</button>
-                                    </form>
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="deleteFile('{{ file.name }}')">삭제</button>
                                 </div>
                             </div>
                         {% endfor %}
@@ -753,17 +751,17 @@
                     <button type="submit" class="btn btn-success btn-lg btn-block" style="margin-top: 15px;">
                         선택한 파일에서 QA 추출
                     </button>
-                {% else %}
-                    <div class="empty-state">
-                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2">
-                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                            <polyline points="13 2 13 9 20 9"></polyline>
-                        </svg>
-                        <p>크롤링된 CSV 파일이 없습니다.</p>
-                        <p style="font-size: 0.9em;">CSV 파일을 업로드하거나 크롤링을 실행해주세요.</p>
-                    </div>
-                {% endif %}
-            </form>
+                </form>
+            {% else %}
+                <div class="empty-state">
+                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2">
+                        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                        <polyline points="13 2 13 9 20 9"></polyline>
+                    </svg>
+                    <p>크롤링된 CSV 파일이 없습니다.</p>
+                    <p style="font-size: 0.9em;">CSV 파일을 업로드하거나 크롤링을 실행해주세요.</p>
+                </div>
+            {% endif %}
         </div>
 
         {% elif page == 'settings' %}
@@ -879,6 +877,16 @@
                 this.parentElement.querySelector('p').textContent = fileName;
             }
         });
+
+        function deleteFile(filename) {
+            if (confirm('삭제하시겠습니까?')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/delete/' + encodeURIComponent(filename);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
 
         // 크롤링 상태 자동 새로고침
         {% if page == 'crawl' and crawl_status and crawl_status.is_running %}

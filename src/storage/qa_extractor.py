@@ -307,15 +307,11 @@ class QAExtractor:
             score += 3
             answer_type = 'informative'
 
-        # 대댓글이면 약간 감점 (직접 답변 우선)
-        if comment.get('is_reply'):
-            score -= 1
-
         return score, answer_type
 
     def select_best_answers(self, comments: List[Dict], question_text: str, max_answers: int = 3) -> List[str]:
         """
-        최적의 답변 선택
+        최적의 답변 선택 (대댓글 제외)
 
         Args:
             comments: 댓글 리스트
@@ -328,9 +324,15 @@ class QAExtractor:
         if not comments:
             return []
 
+        # 대댓글 제외 - 직접 댓글만 사용
+        direct_comments = [c for c in comments if not c.get('is_reply', False)]
+
+        if not direct_comments:
+            return []
+
         # 각 댓글 점수 계산
         scored_comments = []
-        for comment in comments:
+        for comment in direct_comments:
             score, answer_type = self.score_answer(comment, question_text)
             scored_comments.append({
                 'content': comment.get('content', ''),
@@ -371,8 +373,7 @@ class QAExtractor:
         """
         내용 재구성 (저작권 고려, 커뮤니티 말투 유지)
 
-        실제 구현에서는 더 정교한 재구성 로직 필요
-        여기서는 기본적인 정리만 수행
+        게시글을 그대로 가져오지 않고 핵심 내용을 추출하여 재구성
 
         Args:
             text: 원본 텍스트
@@ -387,26 +388,130 @@ class QAExtractor:
         # 기본 정리
         result = text.strip()
 
-        # 과도한 공백 제거
+        # HTML 태그 제거
+        result = re.sub(r'<[^>]+>', '', result)
+
+        # 과도한 공백/줄바꿈 제거
+        result = re.sub(r'\n+', ' ', result)
         result = re.sub(r'\s+', ' ', result)
 
-        # 불필요한 인사말 제거 (질문 앞의 인사말)
-        if is_question:
-            greeting_patterns = [
-                r'^안녕하세요[.!?\s]*',
-                r'^안녕하세요[,]\s*',
-                r'^반갑습니다[.!?\s]*',
-                r'^처음\s*글\s*올립니다[.!?\s]*',
-            ]
-            for pattern in greeting_patterns:
-                result = re.sub(pattern, '', result, flags=re.IGNORECASE)
+        # 불필요한 인사말/마무리 제거
+        remove_patterns = [
+            r'^안녕하세요[.!?,\s]*',
+            r'^반갑습니다[.!?,\s]*',
+            r'^처음\s*글\s*올립니다[.!?,\s]*',
+            r'^글\s*올려봅니다[.!?,\s]*',
+            r'^도움\s*요청\s*드립니다[.!?,\s]*',
+            r'감사합니다[.!]*$',
+            r'감사드립니다[.!]*$',
+            r'부탁드립니다[.!]*$',
+            r'부탁드려요[.!]*$',
+            r'좋은\s*하루\s*되세요[.!]*$',
+            r'읽어주셔서\s*감사합니다[.!]*$',
+        ]
+        for pattern in remove_patterns:
+            result = re.sub(pattern, '', result, flags=re.IGNORECASE)
 
         # 과도한 이모티콘/특수문자 정리
-        result = re.sub(r'[ㅋㅎㅠㅜ]{3,}', '', result)
-        result = re.sub(r'[!?]{3,}', '?', result)
+        result = re.sub(r'[ㅋㅎㅠㅜ]{2,}', '', result)
+        result = re.sub(r'[!]{2,}', '!', result)
+        result = re.sub(r'[?]{2,}', '?', result)
         result = re.sub(r'\.{3,}', '...', result)
+        result = re.sub(r'~+', '~', result)
+
+        # 개인정보 패턴 마스킹
+        result = re.sub(r'\d{2,3}[-.\s]?\d{3,4}[-.\s]?\d{4}', '[연락처]', result)  # 전화번호
+        result = re.sub(r'[가-힣]{2,4}(입니다|이에요|예요)\.?\s*', '', result)  # "OOO입니다" 제거
+
+        # 문장 재구성 (핵심 내용 추출)
+        if is_question:
+            result = self._restructure_question(result)
+        else:
+            result = self._restructure_answer(result)
 
         return result.strip()
+
+    def _restructure_question(self, text: str) -> str:
+        """질문 텍스트 재구성"""
+        if not text:
+            return ""
+
+        # 문장 분리
+        sentences = re.split(r'[.!?]\s*', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        if not sentences:
+            return text
+
+        # 질문 관련 문장 우선 추출
+        question_sentences = []
+        context_sentences = []
+
+        for sent in sentences:
+            # 질문 문장 식별
+            if any(re.search(p, sent) for p in self.QUESTION_PATTERNS):
+                question_sentences.append(sent)
+            elif len(sent) > 10:  # 의미 있는 길이의 문장만
+                context_sentences.append(sent)
+
+        # 재구성: 배경(1-2문장) + 질문
+        result_parts = []
+
+        # 배경 정보 (최대 2문장)
+        if context_sentences:
+            result_parts.extend(context_sentences[:2])
+
+        # 질문 부분
+        if question_sentences:
+            result_parts.extend(question_sentences[:2])
+        elif not result_parts and sentences:
+            # 질문 문장이 없으면 원본에서 핵심 추출
+            result_parts.append(sentences[0])
+
+        # 문장 연결
+        result = '. '.join(result_parts)
+        if result and not result.endswith(('?', '.', '!')):
+            if any(re.search(p, result) for p in [r'[?？]', r'까요', r'나요', r'ㄹ까요', r'인가요']):
+                result += '?'
+            else:
+                result += '.'
+
+        return result
+
+    def _restructure_answer(self, text: str) -> str:
+        """답변 텍스트 재구성"""
+        if not text:
+            return ""
+
+        # 문장 분리
+        sentences = re.split(r'[.!]\s*', text)
+        sentences = [s.strip() for s in sentences if s.strip() and len(s) > 5]
+
+        if not sentences:
+            return text
+
+        # 정보성 문장 우선 추출
+        info_keywords = ['있어요', '있습니다', '해요', '합니다', '됩니다', '되요',
+                        '가면', '이용', '추천', '경험', '알려', '정보',
+                        '연락', '주소', '가격', '비용', '시간', '방법', '하면']
+
+        info_sentences = []
+        other_sentences = []
+
+        for sent in sentences:
+            if any(kw in sent for kw in info_keywords):
+                info_sentences.append(sent)
+            else:
+                other_sentences.append(sent)
+
+        # 재구성: 정보성 문장 우선 (최대 3문장)
+        result_parts = info_sentences[:3] if info_sentences else other_sentences[:2]
+
+        result = '. '.join(result_parts)
+        if result and not result.endswith(('.', '!', '?')):
+            result += '.'
+
+        return result
 
     def process_post(self, post: Dict) -> Optional[QAItem]:
         """
